@@ -3,9 +3,12 @@
     "label": "CEC approved solar batteries",
     "source_url": "https://cer.gov.au/document/cec-approved-solar-batteries-0",
     "format": "csv",
-    "fetched_at": "2026-10-24T02:57:48+00:00",
-    "records": 3668,
-    "current_records": 3446,
+    "fetched_at": "2026-10-24T03:19:12+00:00",
+    "sha256": "80b1e0d935bb63fe4850cd2f507ee5b35d1499a9225acf5db08a9ece5c6c6a02",
+    "records": 3665,
+    "in_source_file": 3665,
+    "current_records": 3444,
+    "delisted_records": 0,
     "field_mapping": {
       "manufacturer": "Manufacturer/Certificate Holder Account",
       "series": "Series",
@@ -15,17 +18,24 @@
       "power": "Nominal Battery Capacity (kWh)"
     },
     "raw_file": "data/raw/batteries.csv",
-    "sha256": "80b1e0d935bb63fe4850cd2f507ee5b35d1499a9225acf5db08a9ece5c6c6a02",
-    "in_source_file": 3668,
-    "delisted_records": 0
+    "last_change": {
+      "added": 0,
+      "delisted_now": 0,
+      "revived": 0,
+      "dates_changed": 1,
+      "in_file": 3665
+    }
   },
   "inverters": {
     "label": "CEC approved inverters",
     "source_url": "https://cer.gov.au/document/cec-approved-inverters-0",
     "format": "csv",
-    "fetched_at": "2026-10-24T02:57:49+00:00",
-    "records": 4850,
-    "current_records": 4042,
+    "fetched_at": "2026-10-24T03:19:12+00:00",
+    "sha256": "1f6359e17ee1cb0526701cad9d8fd6b2a7868a341ff7265735029f8789a4c44e",
+    "records": 4767,
+    "in_source_file": 4767,
+    "current_records": 3983,
+    "delisted_records": 0,
     "field_mapping": {
       "manufacturer": "Manufacturer",
       "series": "Series",
@@ -35,17 +45,24 @@
       "power": "AC Power (kW)"
     },
     "raw_file": "data/raw/inverters.csv",
-    "sha256": "1f6359e17ee1cb0526701cad9d8fd6b2a7868a341ff7265735029f8789a4c44e",
-    "in_source_file": 4850,
-    "delisted_records": 0
+    "last_change": {
+      "added": 0,
+      "delisted_now": 0,
+      "revived": 0,
+      "dates_changed": 82,
+      "in_file": 4767
+    }
   },
   "modules": {
     "label": "CEC approved PV modules",
     "source_url": "https://cer.gov.au/document/cec-approved-pv-modules-0",
     "format": "csv",
-    "fetched_at": "2026-10-24T02:57:49+00:00",
-    "records": 4713,
-    "current_records": 3948,
+    "fetched_at": "2026-10-24T03:19:13+00:00",
+    "sha256": "331160bdc5204dda503cf54c10183032ba16cdbbda909bcde28d28ceadeebfc1",
+    "records": 4710,
+    "in_source_file": 4710,
+    "current_records": 3946,
+    "delisted_records": 0,
     "field_mapping": {
       "manufacturer": "Licensee/Certificate Holder",
       "model": "Model Number",
@@ -53,9 +70,13 @@
       "expiry_date": "Expiry Date"
     },
     "raw_file": "data/raw/modules.csv",
-    "sha256": "331160bdc5204dda503cf54c10183032ba16cdbbda909bcde28d28ceadeebfc1",
-    "in_source_file": 4713,
-    "delisted_records": 0
+    "last_change": {
+      "added": 0,
+      "delisted_now": 0,
+      "revived": 0,
+      "dates_changed": 0,
+      "in_file": 4710
+    }
   },
-  "_about": "Clean Energy Council approved products lists, downloaded from the Clean Energy Regulator document pages. Dates are ISO yyyy-mm-dd. 'current_records' counts listings whose expiry is on/after the fetch date."
+  "_about": "Clean Energy Council approved products lists, downloaded from the Clean Energy Regulator document pages. Dates are ISO yyyy-mm-dd. Rows missing from a new pull are kept with a delisted_date rather than deleted."
 }
