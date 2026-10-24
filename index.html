@@ -135,7 +135,7 @@
         <td>${esc(rating(r))}</td><td>${fmt(r.approval_date)}</td><td>${fmt(r.expiry_date)}${r.delisted_date?`<div class="meta">removed ${fmt(r.delisted_date)}</div>`:""}</td></tr>`;
     }).join("");
     $("empty").hidden = total > 0;
-    $("empty").textContent = q ? (hidden ? `No current listing matches “${q}”, but ${hidden} expired or removed listing${hidden===1?"":"s"} do. Tick “show expired / removed” to see ${hidden===1?"it":"them"}.`
+    $("empty").textContent = q ? (hidden ? `No current listing matches “${q}”, but ${hidden} expired or removed listing${hidden===1?" does":"s do"}. Tick “show expired / removed” to see ${hidden===1?"it":"them"}.`
       : `No listing matches “${q}”. Check the model number on the label and try it without a suffix, or the product may never have been listed.`) : "No data loaded.";
   }
   function renderMeta(){
