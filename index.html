@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CEC Register Lookup</title>
+<meta name="description" content="Instant search of the Clean Energy Council approved inverters, PV modules and batteries lists.">
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--text:#1a1d21;--muted:#5f6670;--line:#e1e4e8;--accent:#0b6e4f;--ok:#0b6e4f;--ok-bg:#dff5ea;--bad:#a3261d;--bad-bg:#fbe3e0;--warn:#8a5a00;--warn-bg:#fff1cc;--focus:#2b7de9}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#111317;--card:#1a1d23;--text:#e8eaed;--muted:#9aa3ad;--line:#2b3038;--accent:#3ac48b;--ok:#3ac48b;--ok-bg:#133d2b;--bad:#ff7b6e;--bad-bg:#4a1f1b;--warn:#f2c35b;--warn-bg:#45370f;--focus:#6ea8fe}}
+  :root[data-theme="dark"]{--bg:#111317;--card:#1a1d23;--text:#e8eaed;--muted:#9aa3ad;--line:#2b3038;--accent:#3ac48b;--ok:#3ac48b;--ok-bg:#133d2b;--bad:#ff7b6e;--bad-bg:#4a1f1b;--warn:#f2c35b;--warn-bg:#45370f;--focus:#6ea8fe}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  main{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
+  h1{font-size:1.35rem;margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 16px;font-size:.9rem}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  input[type=search],input[type=date],select{font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)}
+  input[type=search]{flex:1 1 260px;min-width:0}
+  input:focus,select:focus,button:focus{outline:2px solid var(--focus);outline-offset:1px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .tabs button{font:inherit;padding:7px 12px;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:999px;cursor:pointer}
+  .tabs button[aria-selected=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+  label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:.9rem}
+  .meta{font-size:.82rem;color:var(--muted);margin:0 0 10px}
+  .meta .stale{color:var(--warn);font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:.92rem}
+  th,td{text-align:left;padding:9px 10px;border-top:1px solid var(--line);vertical-align:top}
+  thead th{border-top:0;background:var(--bg);font-weight:600;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0}
+  td.model{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88rem;word-break:break-word}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap}
+  .b-ok{background:var(--ok-bg);color:var(--ok)} .b-bad{background:var(--bad-bg);color:var(--bad)} .b-warn{background:var(--warn-bg);color:var(--warn)}
+  .empty{padding:28px;text-align:center;color:var(--muted)}
+  .count{color:var(--muted);font-size:.85rem;margin:8px 2px}
+  details.extra{font-size:.8rem;color:var(--muted)} details.extra summary{cursor:pointer}
+  @media (max-width:640px){th:nth-child(5),td:nth-child(5){display:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>CEC approved products register</h1>
+  <p class="sub">Inverters, PV modules and batteries from the Clean Energy Council approved lists (Clean Energy Regulator copies). Type a model number or brand.</p>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-kind="all" aria-selected="true">All</button>
+    <button role="tab" data-kind="inverters">Inverters</button>
+    <button role="tab" data-kind="modules">PV modules</button>
+    <button role="tab" data-kind="batteries">Batteries</button>
+  </div>
+
+  <div class="bar">
+    <input id="q" type="search" placeholder="e.g. Primo GEN24 5.0, JKM440N-54HL4R-B, Powerwall 3" autofocus autocomplete="off">
+    <label class="chk">As at <input id="asat" type="date"></label>
+    <label class="chk"><input id="expired" type="checkbox"> show expired</label>
+  </div>
+  <p class="meta" id="meta">Loading register…</p>
+
+  <div class="count" id="count"></div>
+  <div class="card">
+    <table aria-live="polite">
+      <thead><tr><th>Status</th><th>Type</th><th>Manufacturer</th><th>Model</th><th>Rating</th><th>Approved</th><th>Expires</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden></div>
+  </div>
+</main>
+<script>
+(() => {
+  const KINDS = ["inverters","modules","batteries"];
+  const LABEL = {inverters:"Inverter", modules:"PV module", batteries:"Battery"};
+  const data = {};
+  let meta = {};
+  let kind = "all";
+  const $ = id => document.getElementById(id);
+  const squash = s => (s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  const stripSuffix = m => (m||"").replace(/\s*\((?:AS|AS\/NZS)[^)]*\)\s*$/i,"").trim();
+  const fmt = iso => iso ? iso.split("-").reverse().join("/") : "–";
+  const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  try { const t = localStorage.getItem("cec.kind"); if (t) kind = t; } catch {}
+  $("asat").value = new Date().toISOString().slice(0,10);
+
+  function status(rec, asAt){
+    if (rec.approval_date && rec.approval_date > asAt) return "FUTURE";
+    if (rec.expiry_date && rec.expiry_date < asAt) return "EXPIRED";
+    return "LISTED";
+  }
+  function rating(rec){
+    if (rec.power == null) return "";
+    const l = squash(rec.power_label);
+    const unit = l.includes("kwh") || (rec.kind==="batteries" && !l.includes("kw") && !l.includes("w")) ? "kWh" : l.includes("kw") ? "kW" : (l.includes("w")||rec.kind==="modules") ? "W" : "";
+    return `${rec.power} ${unit}`.trim();
+  }
+  function score(q, rec){
+    const qs = squash(q); if (!qs) return 0.01;
+    const ms = squash(rec.model), ms2 = squash(stripSuffix(rec.model));
+    if (qs === ms || qs === ms2) return 1;
+    const hay = squash([rec.manufacturer, rec.series, rec.model].join(" "));
+    if (qs === squash(rec.manufacturer+" "+stripSuffix(rec.model))) return .99;
+    let best = 0;
+    if (ms.includes(qs)) best = Math.max(best, .9 + .09*qs.length/Math.max(ms.length,1));
+    else if (hay.includes(qs)) best = Math.max(best, .8);
+    const toks = q.toLowerCase().split(/[^a-z0-9.]+/).filter(Boolean).map(squash).filter(Boolean);
+    if (toks.length){
+      const hits = toks.filter(t => hay.includes(t)).length, cov = hits/toks.length;
+      if (cov === 1) best = Math.max(best, .75 + .1*Math.min(qs.length/Math.max(ms.length,1),1));
+      else if (cov >= .5) best = Math.max(best, .45*cov);
+    }
+    return best;
+  }
+  function render(){
+    const q = $("q").value.trim(), asAt = $("asat").value || new Date().toISOString().slice(0,10);
+    const showExpired = $("expired").checked;
+    const kinds = kind === "all" ? KINDS : [kind];
+    let out = [];
+    for (const k of kinds) for (const rec of (data[k]||[])){
+      const s = q ? score(q, rec) : 0.01;
+      if (q && s < .4) continue;
+      const st = status(rec, asAt);
+      if (st !== "LISTED" && !showExpired && !(q && s >= .9)) continue;
+      out.push({...rec, kind:k, s, st});
+    }
+    out.sort((a,b) => b.s-a.s || (a.st!=="LISTED")-(b.st!=="LISTED") || (a.manufacturer||"").localeCompare(b.manufacturer||"") || a.model.localeCompare(b.model));
+    const total = out.length; out = out.slice(0, q ? 200 : 300);
+    $("count").textContent = total ? `${total.toLocaleString()} listing${total===1?"":"s"}${total>out.length?` (showing first ${out.length})`:""}` : "";
+    $("rows").innerHTML = out.map(r => {
+      const cls = r.st==="LISTED"?"b-ok":r.st==="EXPIRED"?"b-bad":"b-warn";
+      const extra = Object.entries(r.extra||{}).filter(([,v])=>v).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join(" · ");
+      return `<tr><td><span class="badge ${cls}">${r.st}</span></td><td>${LABEL[r.kind]}</td>
+        <td>${esc(r.manufacturer)}${r.series?`<div class="meta">${esc(r.series)}</div>`:""}</td>
+        <td class="model">${esc(r.model)}${extra?`<details class="extra"><summary>details</summary>${extra}</details>`:""}</td>
+        <td>${esc(rating(r))}</td><td>${fmt(r.approval_date)}</td><td>${fmt(r.expiry_date)}</td></tr>`;
+    }).join("");
+    $("empty").hidden = total > 0;
+    $("empty").textContent = q ? `No listing matches “${q}”. Check the model suffix, tick “show expired”, or the product may have been de-listed.` : "No data loaded.";
+  }
+  function renderMeta(){
+    const parts = []; let stale = false; const now = Date.now();
+    for (const k of KINDS){
+      const m = meta[k]; if (!m){ parts.push(`${k}: no data`); continue; }
+      const age = Math.floor((now - new Date(m.fetched_at))/864e5);
+      if (age > 14) stale = true;
+      parts.push(`${k}: ${m.records.toLocaleString()} listings, fetched ${fmt(m.fetched_at.slice(0,10))}`);
+    }
+    $("meta").innerHTML = parts.join(" · ") + (stale ? ' · <span class="stale">data older than 14 days, run the refresh</span>' : "");
+  }
+  async function load(){
+    try { meta = await (await fetch("data/meta.json", {cache:"no-store"})).json(); } catch { meta = {}; }
+    await Promise.all(KINDS.map(async k => { try { data[k] = await (await fetch(`data/${k}.json`, {cache:"no-store"})).json(); } catch { data[k] = []; } }));
+    renderMeta(); render();
+    if (!KINDS.some(k => data[k].length)) $("meta").textContent = "No register data found. Run scripts/refresh.py (or the GitHub Action) and serve this folder over HTTP.";
+  }
+  $("tabs").addEventListener("click", e => {
+    const b = e.target.closest("button[data-kind]"); if (!b) return;
+    kind = b.dataset.kind; try { localStorage.setItem("cec.kind", kind); } catch {}
+    [...$("tabs").children].forEach(x => x.setAttribute("aria-selected", x===b)); render();
+  });
+  [...$("tabs").children].forEach(x => x.setAttribute("aria-selected", x.dataset.kind===kind));
+  let t; $("q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(render, 60); });
+  $("asat").addEventListener("change", render); $("expired").addEventListener("change", render);
+  load();
+})();
+</script>
+</body>
+</html>
