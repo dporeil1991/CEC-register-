@@ -1,0 +1,52 @@
+{
+  "batteries": {
+    "label": "CEC approved solar batteries",
+    "source_url": "https://cer.gov.au/document/cec-approved-solar-batteries-0",
+    "format": "csv",
+    "fetched_at": "2026-10-24T02:57:48+00:00",
+    "records": 3668,
+    "current_records": 3446,
+    "field_mapping": {
+      "manufacturer": "Manufacturer/Certificate Holder Account",
+      "series": "Series",
+      "model": "Model Number",
+      "approval_date": "CEC Approved Date",
+      "expiry_date": "CEC Expiry Date",
+      "power": "Nominal Battery Capacity (kWh)"
+    },
+    "raw_file": "data/raw/batteries.csv"
+  },
+  "inverters": {
+    "label": "CEC approved inverters",
+    "source_url": "https://cer.gov.au/document/cec-approved-inverters-0",
+    "format": "csv",
+    "fetched_at": "2026-10-24T02:57:49+00:00",
+    "records": 4850,
+    "current_records": 4042,
+    "field_mapping": {
+      "manufacturer": "Manufacturer",
+      "series": "Series",
+      "model": "Model Number",
+      "approval_date": "Approval Date",
+      "expiry_date": "Expiry date",
+      "power": "AC Power (kW)"
+    },
+    "raw_file": "data/raw/inverters.csv"
+  },
+  "modules": {
+    "label": "CEC approved PV modules",
+    "source_url": "https://cer.gov.au/document/cec-approved-pv-modules-0",
+    "format": "csv",
+    "fetched_at": "2026-10-24T02:57:49+00:00",
+    "records": 4713,
+    "current_records": 3948,
+    "field_mapping": {
+      "manufacturer": "Licensee/Certificate Holder",
+      "model": "Model Number",
+      "approval_date": "CEC Approved Date",
+      "expiry_date": "Expiry Date"
+    },
+    "raw_file": "data/raw/modules.csv"
+  },
+  "_about": "Clean Energy Council approved products lists, downloaded from the Clean Energy Regulator document pages. Dates are ISO yyyy-mm-dd. 'current_records' counts listings whose expiry is on/after the fetch date."
+}
