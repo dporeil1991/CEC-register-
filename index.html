@@ -74,7 +74,7 @@
   let kind = "all";
   const $ = id => document.getElementById(id);
   const squash = s => (s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-  const stripSuffix = m => (m||"").replace(/\s*\((?:AS|AS\/NZS)[^)]*\)\s*$/i,"").trim();
+  const stripSuffix = m => (m||"").replace(/\s*\((?:AS|AS\/NZS|IEC)[^)]*\)\s*$/i,"").trim();
   const fmt = iso => iso ? iso.split("-").reverse().join("/") : "–";
   const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
@@ -96,7 +96,8 @@
     const qs = squash(q); if (!qs) return 0.01;
     const ms = squash(rec.model), ms2 = squash(stripSuffix(rec.model));
     if (qs === ms || qs === ms2) return 1;
-    const hay = squash([rec.manufacturer, rec.series, rec.model].join(" "));
+    const brands = Object.entries(rec.extra||{}).filter(([k])=>/brand/i.test(k)).map(([,v])=>v);
+    const hay = squash([rec.manufacturer, rec.series, rec.model, ...brands].join(" "));
     if (qs === squash(rec.manufacturer+" "+stripSuffix(rec.model))) return .99;
     let best = 0;
     if (ms.includes(qs)) best = Math.max(best, .9 + .09*qs.length/Math.max(ms.length,1));

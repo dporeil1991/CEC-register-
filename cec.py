@@ -54,12 +54,15 @@ def load_meta() -> dict:
 
 
 def haystack(rec: dict) -> str:
-    return " ".join(x for x in (rec.get("manufacturer"), rec.get("series"), rec.get("model")) if x)
+    """Searchable text: manufacturer, series, model, plus any brand-like extra column."""
+    parts = [rec.get("manufacturer"), rec.get("series"), rec.get("model")]
+    parts += [v for k, v in (rec.get("extra") or {}).items() if "brand" in k.lower()]
+    return " ".join(x for x in parts if x)
 
 
 def strip_suffix(model: str) -> str:
     """Drop bracketed standard tags such as '(AS4777-2 2020)' or '(AS/NZS 4777.2:2020)'."""
-    return re.sub(r"\s*\((?:AS|AS/NZS)[^)]*\)\s*$", "", model or "", flags=re.I).strip()
+    return re.sub(r"\s*\((?:AS|AS/NZS|IEC)[^)]*\)\s*$", "", model or "", flags=re.I).strip()
 
 
 def score(query: str, rec: dict) -> float:

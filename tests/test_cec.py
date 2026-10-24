@@ -36,10 +36,12 @@ class NormaliseTests(unittest.TestCase):
     def test_module_headers_map(self):
         rows = refresh.rows_from_csv_text((FIX / "modules.csv").read_text())
         norm, mapping = refresh.normalise(rows, "modules")
-        self.assertEqual(mapping["manufacturer"], "Licensee")
+        self.assertEqual(mapping["manufacturer"], "Licensee/Certificate Holder")
         self.assertEqual(mapping["approval_date"], "CEC Approved Date")
-        self.assertEqual(norm[0]["power"], 440)
+        self.assertNotIn("power", mapping)  # the CER module file has no wattage column
+        self.assertIsNone(norm[0]["power"])
         self.assertEqual(norm[0]["extra"]["Fire Tested"], "Yes")
+        self.assertEqual(norm[2]["approval_date"], "2023-03-03")  # single-digit day
 
     def test_dates(self):
         self.assertEqual(refresh.parse_date("31/12/2027"), "2027-12-31")
@@ -87,8 +89,28 @@ class LookupTests(unittest.TestCase):
         self.assertEqual(res[0]["manufacturer"], "Fronius International GmbH")
         self.assertEqual(res[0]["kind"], "inverters")
 
+    def test_brand_column_is_searchable(self):
+        res = cec.search("Energizer Powerstack", ("batteries",), dt.date(2026, 10, 24), False, 5)
+        self.assertEqual(res[0]["model"], "PS2900H-2")
+
+    def test_iec_suffix_ignored(self):
+        self.assertEqual(cec.strip_suffix("TSM-440NEG9R.28 (IEC 61215-2021)"), "TSM-440NEG9R.28")
+        self.assertEqual(cec.strip_suffix("Primo GEN24 5.0 (AS4777-2 2020)"), "Primo GEN24 5.0")
+
     def test_not_found(self):
         self.assertEqual(cec.search("Huawei SUN2000-5KTL", cec.KINDS, dt.date(2026, 10, 24), False, 5), [])
+
+    def test_relisted_model_prefers_current_listing(self):
+        res = cec.search("JKM440N-54HL4R-B", ("modules",), dt.date(2026, 10, 24), False, 5)
+        self.assertEqual(res[0]["model"], "JKM440N-54HL4R-B (IEC 61215-2021)")
+        self.assertEqual(res[0]["status"], "LISTED")
+        self.assertEqual(res[1]["status"], "EXPIRED")
+
+    def test_battery_fields(self):
+        res = cec.search("Powerwall 3", ("batteries",), dt.date(2026, 10, 24), False, 5)
+        self.assertEqual(res[0]["model"], "1707000-10 kVA (AS4777-2 2020)")
+        self.assertEqual(res[0]["extra"]["Usable Capacity (kWh)"], "13.50")
+        self.assertEqual(cec.power_str(res[0]), "14.4 kWh")
 
     def test_cli_exit_codes(self):
         self.assertEqual(cec.main(["check", "JKM440N-54HL4R-B"]), 0)
@@ -102,6 +124,7 @@ class LookupTests(unittest.TestCase):
             cec.main(["check", "Powerwall 3", "--json"])
         out = json.loads(buf.getvalue())
         self.assertEqual(out["results"][0]["kind"], "batteries")
+        self.assertEqual(out["results"][0]["manufacturer"], "Tesla Inc")
         self.assertEqual(out["results"][0]["status"], "LISTED")
 
 
