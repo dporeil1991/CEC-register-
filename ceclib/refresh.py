@@ -223,8 +223,18 @@ def decode_mixed(body: bytes) -> str:
     return text[1:] if text.startswith("\ufeff") else text
 
 
-def merge(previous: list[dict], fresh: list[dict], kind: str, pull_date: str, source_file: str, pull_stamp: str) -> tuple[list[dict], dict]:
-    """Merge a fresh pull into the historical list. Returns (records, change summary)."""
+CONTENT_FIELDS = ("manufacturer", "series", "model", "approval_date", "expiry_date", "power", "power_label", "extra")
+
+
+def merge(previous: list[dict], fresh: list[dict], kind: str, pull_date: str, source_file: str, pull_stamp: str,
+          prev_pull_date: str | None = None) -> tuple[list[dict], dict]:
+    """Merge a fresh pull into the historical list. Returns (records, change summary).
+
+    A row is rewritten only when its content changes, so a pull that changes nothing
+    leaves every row byte-identical (only meta.json moves). last_seen is stamped when a
+    row disappears (the previous pull date) and source_pull records the pull that last
+    changed the row.
+    """
     by_id = {identity(r): r for r in previous}
     seen: set[str] = set()
     added = revived = changed = 0
@@ -243,15 +253,17 @@ def merge(previous: list[dict], fresh: list[dict], kind: str, pull_date: str, so
             added += 1
             merged.append(rec)
             continue
-        if old.get("delisted_date"):
+        was_delisted = bool(old.get("delisted_date"))
+        content_changed = any(old.get(f) != rec.get(f) for f in CONTENT_FIELDS)
+        if was_delisted:
             revived += 1
         if (old.get("approval_date"), old.get("expiry_date")) != (rec.get("approval_date"), rec.get("expiry_date")):
             changed += 1
-        old.update(series=rec.get("series", ""), model=rec["model"], manufacturer=rec["manufacturer"],
-                   approval_date=rec["approval_date"], expiry_date=rec["expiry_date"], power=rec["power"],
-                   power_label=rec["power_label"], extra=rec["extra"], last_seen=pull_date, delisted_date=None,
-                   source_file=source_file, source_pull=pull_stamp)
+        if content_changed or was_delisted:
+            old.update({f: rec.get(f) for f in CONTENT_FIELDS})
+            old.update(last_seen=pull_date, delisted_date=None, source_file=source_file, source_pull=pull_stamp)
         old.setdefault("first_seen", pull_date)
+        old.setdefault("last_seen", pull_date)
         merged.append(old)
     delisted = 0
     for key, old in by_id.items():
@@ -259,6 +271,7 @@ def merge(previous: list[dict], fresh: list[dict], kind: str, pull_date: str, so
             continue
         if not old.get("delisted_date"):
             old["delisted_date"] = pull_date
+            old["last_seen"] = prev_pull_date or old.get("last_seen") or old.get("first_seen")
             delisted += 1
         merged.append(old)
     merged.sort(key=lambda r: (bool(r.get("delisted_date")), squash(r["manufacturer"]), squash(r["model"])))
@@ -278,7 +291,8 @@ def save(kind: str, label: str, source_url: str, fmt: str, body: bytes, rows: li
     raw_path = RAW / f"{kind}.{fmt}"
     raw_path.write_bytes(body)
     source_file = str(raw_path.relative_to(ROOT)) if raw_path.is_relative_to(ROOT) else str(raw_path)
-    merged, summary = merge(load_kind(kind), rows, kind, pull_date, source_file, pull_stamp)
+    prev_pull = (meta.get(kind) or {}).get("fetched_at", "")[:10] or None
+    merged, summary = merge(load_kind(kind), rows, kind, pull_date, source_file, pull_stamp, prev_pull)
     (DATA / f"{kind}.json").write_text("[\n" + ",\n".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in merged) + "\n]\n", encoding="utf-8")
     current = sum(1 for r in merged if not r.get("delisted_date") and (not r["expiry_date"] or r["expiry_date"] >= pull_date))
     meta[kind] = {

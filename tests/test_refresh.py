@@ -50,13 +50,13 @@ class MergeNeverDeletes(unittest.TestCase):
         self.assertEqual(s1["added"], 2)
         self.assertEqual([r["id"] for r in first], ["inv-1", "inv-2"])
         # A2 disappears from the next pull: kept, stamped, not deleted
-        second, s2 = refresh.merge(first, [rec("Acme", "A1", exp="2028-01-01")], "inverters", "2026-02-01", "raw/a.csv", "t2")
+        second, s2 = refresh.merge(first, [rec("Acme", "A1", exp="2028-01-01")], "inverters", "2026-02-01", "raw/a.csv", "t2", "2026-01-01")
         self.assertEqual(len(second), 2)
         a2 = next(r for r in second if r["model"] == "A2")
         self.assertEqual(a2["delisted_date"], "2026-02-01")
         self.assertEqual(a2["last_seen"], "2026-01-01")
         a1 = next(r for r in second if r["model"] == "A1")
-        self.assertEqual((a1["expiry_date"], a1["first_seen"], a1["last_seen"]), ("2028-01-01", "2026-01-01", "2026-02-01"))
+        self.assertEqual((a1["expiry_date"], a1["first_seen"], a1["last_seen"], a1["source_pull"]), ("2028-01-01", "2026-01-01", "2026-02-01", "t2"))
         self.assertEqual(s2["delisted_now"], 1)
         self.assertEqual(s2["dates_changed"], 1)
         # A2 comes back: revived, same id
@@ -65,6 +65,14 @@ class MergeNeverDeletes(unittest.TestCase):
         self.assertIsNone(a2["delisted_date"])
         self.assertEqual(a2["id"], "inv-2")
         self.assertEqual(s3["revived"], 1)
+
+    def test_unchanged_rows_are_not_rewritten(self):
+        import copy
+        first, _ = refresh.merge([], [rec("Acme", "A1"), rec("Acme", "A2")], "inverters", "2026-01-01", "f", "t1")
+        before = copy.deepcopy(first)
+        again, s = refresh.merge(first, [rec("Acme", "A1"), rec("Acme", "A2")], "inverters", "2026-02-01", "f", "t2", "2026-01-01")
+        self.assertEqual(again, before)  # byte-identical rows: a quiet pull only moves meta.json
+        self.assertEqual(s, {"added": 0, "delisted_now": 0, "revived": 0, "dates_changed": 0, "in_file": 2})
 
     def test_identity_ignores_case_and_whitespace_only(self):
         first, _ = refresh.merge([], [rec("Acme Co Ltd", "SG5.0RS (AS4777-2 2020)")], "inverters", "2026-01-01", "f", "t")
