@@ -1,54 +1,63 @@
 # CEC register – instructions for Claude
 
-This repo holds a local copy of the Clean Energy Council (CEC) approved products
-lists (inverters/PCE, PV modules, batteries), refreshed from the Clean Energy
-Regulator's published CSV files. Use it to answer "is X CEC approved?" for
-Daniel's Solar PV Specialist Reports. **Do not web-search the CEC site for
+Local copy of the Clean Energy Council (CEC) approved products lists (inverters/PCE,
+PV modules, batteries) from the Clean Energy Regulator's published CSV files, with
+a lookup CLI, a jobs log and a static web UI. Use it to answer "is X CEC approved?"
+for Daniel's Solar PV Specialist Reports. **Never web-search the CEC site for
 approval status when this repo is available.**
 
-## How to check a product
+## Checking a product
 
 ```bash
-python3 cec.py check "<manufacturer and/or model>"          # all three lists
-python3 cec.py check "<model>" --as-at 2025-03-14          # status at install/inspection date
-python3 cec.py inverters "<model>"   /  modules  /  batteries
-python3 cec.py check "<model>" --json                      # structured output
-python3 cec.py stats                                       # counts + data age
+./cec check inverter "Sungrow SG5K-D" --job 51814          # one product, logged against the job
+./cec check panel "RSM108-9-440NDG" --watts 440 --job 51814
+./cec check battery "Sungrow SBR192" --job 51911
+./cec check inverter "Fronius Primo 5.0-1" --as-at 14/03/2025   # status at the install date
+./cec check "Trina 440W"                                     # brand + rating only: lists candidates
+./cec check ... --json                                       # structured output
+./cec batch jobs.csv --out results.csv                       # columns: job, kind, model[, watts, kw, as_at]
+./cec expiring --days 90 --sentences                        # logged products lapsing soon
+./cec jobs --job 51814 ; ./cec stats
 ```
 
-Exit codes: 0 best match LISTED, 2 best match EXPIRED, 1 nothing found / no data.
+Category word is optional (`inverter|panel|battery`); without it all three lists are
+searched. Every check is appended to `data/jobs.csv` unless `--no-log`; always pass
+`--job` when the check is for a job. Exit codes: 0 approved, 2 expired/removed, 1 not found.
 
-## Rules for reporting
+## Reading the result
 
-- Quote the exact listed model string, manufacturer, approval date and expiry
-  date from the output. Report wording: "Listed on the CEC approved
-  <inverter|PV module|battery> list (approved dd/mm/yyyy, expiry dd/mm/yyyy)".
-- For an inspection report, check status **as at the installation date** with
-  `--as-at`, and also mention if the listing has since expired.
-- EXPIRED means the CEC listing lapsed (no new STCs); it is not itself a
-  compliance defect for an existing install. NOT FOUND may mean de-listed,
-  never listed, or a different model suffix: show the "nearest listings" and
-  say which.
-- Never say "approved" without a match. If `cec.py stats` shows data older than
-  14 days, say so and run the refresh (see below) or trigger the GitHub Action.
-- Model strings often carry a standard tag like `(AS4777-2 2020)`; the search
-  ignores it, but quote it in the report.
+- `APPROVED` – current listing. `APPROVED - EXPIRING SOON` – current but lapses within
+  6 months: say so to Daniel, because a report issued after the date must change.
+- `LISTING EXPIRED` – still in the published file, expiry passed. `REMOVED FROM LIST` –
+  vanished from a later pull (date shown). `NOT LISTED` – no current or expired listing;
+  the output shows nearest listings with ratings so "same family, different wattage"
+  can be judged. If the brand has no products at all, the output says so.
+- `[variant: suffix differs]` means the key matched after stripping -NI/-ADA/AUS/SC/
+  Plus/DG; quote the listed name, not the nameplate text, in the report.
+- A `probable match` or `MISMATCH` flag (wattage/kW differs from the nameplate) means
+  confirm the model from the label photo before relying on it.
+- Use the **Report sentence** line verbatim in the report. It is written in formal
+  insurer tone; do not add commentary about how the match was made.
 
-## Refreshing the data
+## Data discipline
 
-- GitHub Action `Refresh CEC register` runs Mon/Thu and on `workflow_dispatch`;
-  it commits `data/*.json` and `data/raw/*`.
-- Locally: `python3 scripts/refresh.py` (needs internet to cer.gov.au).
-- Manual file: `python3 scripts/refresh.py --from-file inverters path.csv`.
-- Cloud sessions usually cannot reach cer.gov.au; trigger the Action instead
-  and `git pull`.
+- `data/<kind>.json` holds every listing ever seen. Rows are never deleted on
+  re-import; missing rows get `delisted_date`. `data/raw/*.csv` are the source files
+  (sha256 in `data/meta.json`), so every result traces to a file and pull date.
+- Every result prints the pull date. Over 30 days old = stale: say so, then refresh.
+- Refresh is manual by design: GitHub Actions → "Refresh CEC register" → Run workflow,
+  then `git pull`. Locally `./cec refresh` (needs cer.gov.au access; cloud sessions
+  usually do not have it). A file downloaded by hand: `./cec refresh --from-file inverters path.csv`.
+- `data/cec.db` is a derived SQLite index (gitignored, rebuilt automatically).
+  `data/jobs.csv` and `data/aliases.json` are the record for jobs and brand aliases;
+  commit them when they change.
+- Brand spelt differently from the manufacturer name? Add it to `data/aliases.json`.
 
 ## Layout
 
-- `cec.py` – lookup CLI (stdlib only)
-- `scripts/refresh.py` – download + normalise; `data/meta.json` records sources,
-  fetch time and the header→field mapping actually used
-- `data/<kind>.json` – records: manufacturer, series, model, approval_date,
-  expiry_date (ISO), power, power_label, extra (all other source columns)
-- `index.html` – static search UI over the same JSON (GitHub Pages ready)
-- `tests/` – unit tests with fixture CSVs (`python3 -m unittest discover -s tests`)
+- `cec`, `cec.py` – entry points; `ceclib/` – `normalise` (keys, ratings, aliases),
+  `match` (ranking), `report` (result + sentence), `store` (SQLite, jobs CSV), `refresh`
+  (download, merge, delist), `cli`.
+- `index.html` – static search UI over the same JSON (GitHub Pages ready).
+- `tests/` – `python3 -m unittest discover -s tests -t .`; `tests/seed_cases.json` are
+  products checked by hand for real reports and must keep passing.

@@ -1,9 +1,8 @@
 # CEC register
 
-A local, searchable copy of the Clean Energy Council (CEC) approved products
-lists for Australia: **inverters / power conversion equipment**, **PV modules**
-and **batteries**. Built so approval checks for Solar PV Specialist Reports
-take one command instead of a trip to the website.
+A local, searchable copy of the Clean Energy Council (CEC) approved products lists for
+Australia: **inverters / power conversion equipment**, **PV modules** and **batteries**,
+with a lookup tool that answers in insurer-report language and keeps a log per job.
 
 Data comes from the official copies the Clean Energy Regulator publishes:
 
@@ -14,43 +13,77 @@ Data comes from the official copies the Clean Energy Regulator publishes:
 ## Quick start
 
 ```bash
-python3 cec.py check "Fronius Primo GEN24 5.0"
-python3 cec.py check "JKM440N-54HL4R-B" --as-at 14/03/2025   # status at install date
-python3 cec.py modules trina 440 --limit 20
-python3 cec.py stats
+./cec check inverter "Sungrow SG5K-D" --job 51814
+./cec check panel "Jinko JKM440N-54HL4R-V" --watts 440 --job 51814
+./cec check "Fronius Primo 5.0-1" --as-at 14/03/2025     # status at the install date
+./cec batch jobs.csv --out results.csv                    # job, kind, model[, watts, kw, as_at]
+./cec expiring --days 90 --sentences                     # anything in the log lapsing soon
+./cec jobs            ./cec stats            ./cec refresh
 ```
 
-Output shows `LISTED`, `EXPIRED` or `NOT FOUND`, with the exact listed model,
-approval and expiry dates. Add `--all` to include expired listings, `--json`
-for machine-readable output.
+A check prints the result, the exact listed name, approval and approved-until dates,
+the register pull date (with a warning past 30 days), a ready-to-paste report sentence,
+and the nearest listings with their ratings when there is no exact hit.
 
-## Web UI
+```
+Sungrow SG5K-D   ·   inverter   ·   status as at 24/10/2026
+  Inverter  register pulled 24/10/2026 (0d ago), 4850 listings, source inverters.csv
 
-`index.html` is a static page that searches the same data. Serve the folder
-(`python3 -m http.server`) or enable GitHub Pages on this repo (Settings →
-Pages → Deploy from branch → `master` / root) and open it from any device.
+RESULT: LISTING EXPIRED
+  listed as:       SG5K-D-NI (AS4777-2 2020)   [variant: suffix differs]
+  manufacturer:    Sungrow Power Supply Co Ltd
+  rating:          4.999 kW
+  approved:        02/08/2022      approved until: 02/08/2025
+  checked:         24/10/2026
+
+Report sentence:
+  The Sungrow SG5K-D inverter is not currently listed on the CEC approved products list
+  (the listing for "SG5K-D-NI (AS4777-2 2020)" expired on 2 August 2025; checked 24 October 2026).
+```
+
+Results: **Approved**, **Approved, expiring within 6 months**, **Listing expired** (date),
+**Removed from the list** (date it vanished from a pull), **Not listed**.
+
+## How matching works
+
+- Model numbers are reduced to a key: standards bracket removed (`(AS4777-2 2020)`,
+  `(IEC 61215-2021)`), known suffixes removed (`-NI`, `-ADA`, `AUS`, `SC`, `Plus`, `DG`),
+  spaces/hyphens/case ignored. The listed text is always kept and quoted.
+- Brand words are recognised through `data/aliases.json` (Solis = Ginlong, Qcells =
+  Hanwha Q CELLS, EGing = Changzhou EGing, ...). Add your own lines there.
+- Wattage / kW on the nameplate (`--watts 440`, `--kw 5`, or just `440W` in the text) is a
+  secondary key: it flags a mismatch and, with a brand alone, lists that brand's
+  products at that rating.
+- Nothing exact: ranked near-matches with similarity scores and ratings are shown.
+
+## Data model
+
+- `data/inverters.json`, `data/modules.json`, `data/batteries.json` – one row per listing
+  ever seen: manufacturer, model as listed, normalised key, standard, approved date,
+  approved-until date, first/last seen, `delisted_date`, source file and pull stamp.
+  Rows are never deleted on re-import; a row missing from a new pull is marked delisted.
+- `data/raw/*.csv` – the CER files as downloaded (sha256 recorded in `data/meta.json`).
+- `data/jobs.csv` – every check: job, model, result, approved-until, date checked.
+- `data/aliases.json` – manufacturer aliases.
+- `data/cec.db` – SQLite index rebuilt automatically from the files above (not committed).
 
 ## Keeping it fresh
 
-The GitHub Action in `.github/workflows/refresh.yml` downloads the lists twice
-a week (and on demand via *Run workflow*) and commits any changes. Because raw
-files are committed too, `git log -p data/raw` shows exactly what was added or
-de-listed and when.
+Refresh is manual. On GitHub: Actions → *Refresh CEC register* → *Run workflow*; it
+downloads the three lists, merges them, runs the tests and commits. Locally:
+`./cec refresh`, or `./cec refresh --from-file modules ~/Downloads/file.csv` for a file
+you downloaded yourself. `git log -p data/raw` shows exactly what changed between pulls.
 
-To refresh locally: `python3 scripts/refresh.py`. To load a file you downloaded
-by hand: `python3 scripts/refresh.py --from-file inverters ~/Downloads/x.csv`.
+## Web UI
 
-## Notes on status
-
-- **LISTED**: on the current CEC list and the listing has not expired.
-- **EXPIRED**: still in the published file but past its expiry date. New STCs
-  cannot be claimed; it is not by itself a defect for an existing system.
-- **NOT FOUND**: not in the current file. Products the CEC removes disappear
-  from the list entirely, so check the git history of `data/raw` if you need
-  to prove a product was listed at a past date.
+`index.html` searches the same data in a browser. Serve the folder (`python3 -m
+http.server`) or enable GitHub Pages (Settings → Pages → Deploy from branch → `master`, root).
 
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -t . -v
 ```
+
+`tests/seed_cases.json` holds products checked by hand for real reports and the answers
+reached; the suite fails if the tool ever disagrees with them.

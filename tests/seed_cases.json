@@ -1,0 +1,27 @@
+{
+  "_about": "Products checked by hand for Solar PV Specialist Reports in October 2026, with the answers reached then. Status is evaluated as at 2026-10-24 against the register snapshot in data/. If a later register pull changes an expectation, the test tells you which product moved.",
+  "today": "2026-10-24",
+  "cases": [
+    {"job": "51814", "kind": "inverters", "query": "Sungrow SG5.0RS", "result": "APPROVED", "listed_name": "SG5.0RS (AS4777-2 2020)", "approved_until": "2028-07-07"},
+    {"job": "51814", "kind": "modules", "query": "Jinko JKM440N-54HL4R-V", "result": "APPROVED_EXPIRING", "listed_name": "JKM440N-54HL4R-V (IEC 61215-2021)", "approved_until": "2027-04-04"},
+    {"job": "51871", "kind": "inverters", "query": "Samil Power SR2K8TLA1", "result": "NOT_LISTED", "brand_absent": true},
+    {"job": "51871", "kind": "modules", "query": "ZKX ZKX-195D-24", "result": "NOT_LISTED"},
+    {"job": "AIB-18814-46890", "kind": "inverters", "query": "Sungrow SG5K-D", "result": "EXPIRED", "listed_name": "SG5K-D-NI (AS4777-2 2020)", "approved_until": "2025-08-02", "match_type": "variant"},
+    {"job": "AIB-18814-46890", "kind": "modules", "query": "EGing EG-265P60-C", "result": "NOT_LISTED"},
+    {"job": "51993", "kind": "inverters", "query": "Fronius Primo 5.0-1", "result": "APPROVED_EXPIRING", "listed_name": "Primo 5.0-1 (AS4777-2 2020)", "approved_until": "2026-11-24"},
+    {"job": "51993", "kind": "modules", "query": "JA Solar JAM60S10-330/PR/1000V", "result": "EXPIRED", "listed_name": "JAM60S10-330/PR/1000V", "approved_until": "2025-03-31"},
+    {"job": "51911", "kind": "inverters", "query": "Solis S5-GR1P5K", "result": "APPROVED", "listed_name": "S5-GR1P5K (AS4777-2 2020)", "approved_until": "2027-06-20", "manufacturer": "Ginlong Technologies Co Ltd"},
+    {"job": "51911", "kind": "inverters", "query": "Sungrow SH5.0RS", "result": "APPROVED", "listed_name": "SH5.0RS (AS4777-2 2020)", "approved_until": "2028-01-30"},
+    {"job": "51911", "kind": "modules", "query": "Talesun TP6L60M-370", "result": "NOT_LISTED"},
+    {"job": "51911", "kind": "batteries", "query": "Sungrow SBR192", "result": "APPROVED_EXPIRING", "listed_name": "SBR192", "approved_until": "2026-11-30"},
+    {"job": "51861", "kind": "inverters", "query": "Sungrow SH8.0RS", "result": "APPROVED", "listed_name": "SH8.0RS (AS4777-2 2020)", "approved_until": "2029-06-29"},
+    {"job": "51861", "kind": "modules", "query": "Seraphim SRP-440-BTD-BG", "result": "APPROVED_EXPIRING", "listed_name": "SRP-440-BTD-BG (IEC 61215-2021)", "approved_until": "2027-04-01"},
+    {"job": "51861", "kind": "batteries", "query": "Sungrow SBR160", "result": "APPROVED_EXPIRING", "listed_name": "SBR160", "approved_until": "2026-11-30"},
+    {"job": "51756", "kind": "inverters", "query": "ZeverSolar TLC20K", "result": "NOT_LISTED", "brand_absent": true},
+    {"job": "51756", "kind": "modules", "query": "Yingli YL250P-29b", "result": "NOT_LISTED"},
+    {"job": "spec", "kind": "inverters", "query": "Fronius Primo GEN24 10.0 Plus", "result": "APPROVED", "listed_name": "Primo GEN24 10.0 Plus (AS4777-2 2020)", "match_type": "exact"},
+    {"job": "spec", "kind": "inverters", "query": "SH8.0RS (AS4777-2 2020)", "result": "APPROVED", "listed_name": "SH8.0RS (AS4777-2 2020)", "match_type": "exact"},
+    {"job": "spec", "kind": "modules", "query": "Risen RSM108-9-440NDG", "result": "APPROVED", "listed_name": "RSM108-9-440NDG (IEC 61215-2021)", "match_type": "exact"},
+    {"job": "spec", "kind": "inverters", "query": "SolaX X1-MINI-1.5K-G4", "result": "APPROVED_EXPIRING", "listed_name": "X1-MINI-1.5K-G4 (AS4777-2 2020)", "approved_until": "2026-10-25"}
+  ]
+}

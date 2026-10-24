@@ -1,9 +1,10 @@
 name: Refresh CEC register
 
 on:
-  schedule:
-    - cron: "17 19 * * 0,3"   # Mon + Thu 05:17 AEST (Sun/Wed 19:17 UTC)
-  workflow_dispatch:
+  workflow_dispatch:          # run by hand: Actions -> Refresh CEC register -> Run workflow
+  # To refresh automatically instead, uncomment:
+  # schedule:
+  #   - cron: "17 19 * * 0,3"   # Mon + Thu 05:17 AEST (Sun/Wed 19:17 UTC)
 
 permissions:
   contents: write
@@ -25,13 +26,16 @@ jobs:
       - name: Install optional XLSX support
         run: pip install --quiet openpyxl
 
-      - name: Download and normalise the CEC lists
+      - name: Run the test suite against the committed data
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Download and merge the CEC lists (rows are never deleted, only marked delisted)
         run: python scripts/refresh.py
 
-      - name: Smoke test the lookup CLI
+      - name: Show what changed
         run: |
           python cec.py stats
-          python -m unittest discover -s tests -v
+          git --no-pager diff --stat -- data
 
       - name: Commit updated data
         run: |

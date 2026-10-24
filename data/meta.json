@@ -14,7 +14,10 @@
       "expiry_date": "CEC Expiry Date",
       "power": "Nominal Battery Capacity (kWh)"
     },
-    "raw_file": "data/raw/batteries.csv"
+    "raw_file": "data/raw/batteries.csv",
+    "sha256": "80b1e0d935bb63fe4850cd2f507ee5b35d1499a9225acf5db08a9ece5c6c6a02",
+    "in_source_file": 3668,
+    "delisted_records": 0
   },
   "inverters": {
     "label": "CEC approved inverters",
@@ -31,7 +34,10 @@
       "expiry_date": "Expiry date",
       "power": "AC Power (kW)"
     },
-    "raw_file": "data/raw/inverters.csv"
+    "raw_file": "data/raw/inverters.csv",
+    "sha256": "1f6359e17ee1cb0526701cad9d8fd6b2a7868a341ff7265735029f8789a4c44e",
+    "in_source_file": 4850,
+    "delisted_records": 0
   },
   "modules": {
     "label": "CEC approved PV modules",
@@ -46,7 +52,10 @@
       "approval_date": "CEC Approved Date",
       "expiry_date": "Expiry Date"
     },
-    "raw_file": "data/raw/modules.csv"
+    "raw_file": "data/raw/modules.csv",
+    "sha256": "331160bdc5204dda503cf54c10183032ba16cdbbda909bcde28d28ceadeebfc1",
+    "in_source_file": 4713,
+    "delisted_records": 0
   },
   "_about": "Clean Energy Council approved products lists, downloaded from the Clean Energy Regulator document pages. Dates are ISO yyyy-mm-dd. 'current_records' counts listings whose expiry is on/after the fetch date."
 }

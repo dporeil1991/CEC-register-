@@ -52,7 +52,7 @@
   <div class="bar">
     <input id="q" type="search" placeholder="e.g. Primo GEN24 5.0, JKM440N-54HL4R-B, Powerwall 3" autofocus autocomplete="off">
     <label class="chk">As at <input id="asat" type="date"></label>
-    <label class="chk"><input id="expired" type="checkbox"> show expired</label>
+    <label class="chk"><input id="expired" type="checkbox"> show expired / removed</label>
   </div>
   <p class="meta" id="meta">Loading register…</p>
 
@@ -74,7 +74,7 @@
   let kind = "all";
   const $ = id => document.getElementById(id);
   const squash = s => (s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-  const stripSuffix = m => (m||"").replace(/\s*\((?:AS|AS\/NZS|IEC)[^)]*\)\s*$/i,"").trim();
+  const stripSuffix = m => (m||"").replace(/\s*\((?:AS|AS\/NZS|IEC)[^)]*\)\s*$/i,"").replace(/[\s\-_\/]+(?:NI|ADA|AUS|SC|PLUS|DG)$/i,"").replace(/(?<=\d[A-Z])DG$|(?<=\d)DG$/i,"").trim();
   const fmt = iso => iso ? iso.split("-").reverse().join("/") : "–";
   const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
@@ -83,6 +83,7 @@
 
   function status(rec, asAt){
     if (rec.approval_date && rec.approval_date > asAt) return "FUTURE";
+    if (rec.delisted_date && rec.delisted_date <= asAt) return "DELISTED";
     if (rec.expiry_date && rec.expiry_date < asAt) return "EXPIRED";
     return "LISTED";
   }
@@ -114,37 +115,38 @@
     const q = $("q").value.trim(), asAt = $("asat").value || new Date().toISOString().slice(0,10);
     const showExpired = $("expired").checked;
     const kinds = kind === "all" ? KINDS : [kind];
-    let out = [];
+    let out = []; let hidden = 0;
     for (const k of kinds) for (const rec of (data[k]||[])){
       const s = q ? score(q, rec) : 0.01;
       if (q && s < .4) continue;
       const st = status(rec, asAt);
-      if (st !== "LISTED" && !showExpired && !(q && s >= .9)) continue;
+      if (st !== "LISTED" && !showExpired && !(q && s >= .9)) { if (s >= .6) hidden++; continue; }
       out.push({...rec, kind:k, s, st});
     }
     out.sort((a,b) => b.s-a.s || (a.st!=="LISTED")-(b.st!=="LISTED") || (a.manufacturer||"").localeCompare(b.manufacturer||"") || a.model.localeCompare(b.model));
     const total = out.length; out = out.slice(0, q ? 200 : 300);
     $("count").textContent = total ? `${total.toLocaleString()} listing${total===1?"":"s"}${total>out.length?` (showing first ${out.length})`:""}` : "";
     $("rows").innerHTML = out.map(r => {
-      const cls = r.st==="LISTED"?"b-ok":r.st==="EXPIRED"?"b-bad":"b-warn";
+      const cls = r.st==="LISTED"?"b-ok":(r.st==="EXPIRED"||r.st==="DELISTED")?"b-bad":"b-warn";
       const extra = Object.entries(r.extra||{}).filter(([,v])=>v).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join(" · ");
       return `<tr><td><span class="badge ${cls}">${r.st}</span></td><td>${LABEL[r.kind]}</td>
         <td>${esc(r.manufacturer)}${r.series?`<div class="meta">${esc(r.series)}</div>`:""}</td>
         <td class="model">${esc(r.model)}${extra?`<details class="extra"><summary>details</summary>${extra}</details>`:""}</td>
-        <td>${esc(rating(r))}</td><td>${fmt(r.approval_date)}</td><td>${fmt(r.expiry_date)}</td></tr>`;
+        <td>${esc(rating(r))}</td><td>${fmt(r.approval_date)}</td><td>${fmt(r.expiry_date)}${r.delisted_date?`<div class="meta">removed ${fmt(r.delisted_date)}</div>`:""}</td></tr>`;
     }).join("");
     $("empty").hidden = total > 0;
-    $("empty").textContent = q ? `No listing matches “${q}”. Check the model suffix, tick “show expired”, or the product may have been de-listed.` : "No data loaded.";
+    $("empty").textContent = q ? (hidden ? `No current listing matches “${q}”, but ${hidden} expired or removed listing${hidden===1?"":"s"} do. Tick “show expired / removed” to see ${hidden===1?"it":"them"}.`
+      : `No listing matches “${q}”. Check the model number on the label and try it without a suffix, or the product may never have been listed.`) : "No data loaded.";
   }
   function renderMeta(){
     const parts = []; let stale = false; const now = Date.now();
     for (const k of KINDS){
       const m = meta[k]; if (!m){ parts.push(`${k}: no data`); continue; }
       const age = Math.floor((now - new Date(m.fetched_at))/864e5);
-      if (age > 14) stale = true;
+      if (age > 30) stale = true;
       parts.push(`${k}: ${m.records.toLocaleString()} listings, fetched ${fmt(m.fetched_at.slice(0,10))}`);
     }
-    $("meta").innerHTML = parts.join(" · ") + (stale ? ' · <span class="stale">data older than 14 days, run the refresh</span>' : "");
+    $("meta").innerHTML = parts.join(" · ") + (stale ? ' · <span class="stale">data older than 30 days, run the refresh</span>' : "");
   }
   async function load(){
     try { meta = await (await fetch("data/meta.json", {cache:"no-store"})).json(); } catch { meta = {}; }
