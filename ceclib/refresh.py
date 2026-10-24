@@ -92,14 +92,8 @@ def find_file_links(page_html: str, base_url: str) -> list[str]:
 def rows_from_bytes(body: bytes, hint: str) -> tuple[list[dict], str]:
     if body[:2] == b"PK":
         return rows_from_xlsx(body), "xlsx"
-    text = None
-    for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
-        try:
-            text = body.decode(enc)
-            break
-        except UnicodeDecodeError:
-            continue
-    if text is None or "<html" in text[:2000].lower():
+    text = decode_mixed(body)
+    if "<html" in text[:2000].lower():
         raise ValueError(f"{hint}: not a CSV/XLSX payload")
     return rows_from_csv_text(text), "csv"
 
@@ -207,8 +201,26 @@ def normalise(rows: list[dict], kind: str) -> tuple[list[dict], dict[str, str]]:
     return out, mapping
 
 
+def _norm_text(s: str | None) -> str:
+    """Case- and whitespace-insensitive, but every other character kept: 'Q.MAXX-G4+ 410' stays distinct from 'Q.MAXX-G4 410'."""
+    return re.sub(r"\s+", " ", (s or "")).strip().lower()
+
+
 def identity(rec: dict) -> str:
-    return squash(rec.get("manufacturer")) + "|" + squash(rec.get("model"))
+    """One listing = one certification: the same model re-certified later is a new row, not an update."""
+    return _norm_text(rec.get("manufacturer")) + "|" + _norm_text(rec.get("model")) + "|" + (rec.get("approval_date") or "")
+
+
+def decode_mixed(body: bytes) -> str:
+    """CER files mix UTF-8 (e.g. 'α') and cp1252 (e.g. a bare '°') bytes; decode line by line."""
+    out = []
+    for line in body.split(b"\n"):
+        try:
+            out.append(line.decode("utf-8"))
+        except UnicodeDecodeError:
+            out.append(line.decode("cp1252", errors="replace"))
+    text = "\n".join(out)
+    return text[1:] if text.startswith("\ufeff") else text
 
 
 def merge(previous: list[dict], fresh: list[dict], kind: str, pull_date: str, source_file: str, pull_stamp: str) -> tuple[list[dict], dict]:
@@ -220,7 +232,7 @@ def merge(previous: list[dict], fresh: list[dict], kind: str, pull_date: str, so
     merged: list[dict] = []
     for rec in fresh:
         key = identity(rec)
-        if key in seen:  # duplicate row in the source file
+        if key in seen:  # an identical repeat of a row already in this file
             continue
         seen.add(key)
         old = by_id.get(key)

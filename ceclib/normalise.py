@@ -35,6 +35,11 @@ _LEGAL_RE = re.compile(
     re.I,
 )
 
+CORPORATE_WORDS = {"technology", "technologies", "electric", "electrical", "electronics", "energy", "power", "solar",
+                   "international", "australia", "australian", "limited", "company", "digital", "system", "systems",
+                   "group", "holding", "holdings", "industries", "renewable", "renewables", "storage", "battery",
+                   "innovations", "equipment", "development", "operations", "network", "supply", "science", "trading"}
+
 STOPWORDS = {"inverter", "inverters", "panel", "panels", "module", "modules", "battery", "batteries",
              "solar", "hybrid", "pv", "the", "and", "kw", "w", "kwh", "model", "series", "string",
              "single", "phase", "three", "grid", "tied", "tie"}
@@ -195,10 +200,11 @@ def split_query(query: str, known_manufacturers: list[str] | None = None) -> dic
                     hit = True
             if (not hit and known_manufacturers and n == 1 and i == 0 and len(run) >= 4
                     and run not in STOPWORDS and run.upper() not in KNOWN_SUFFIXES and not any(ch.isdigit() for ch in run)):
-                # the leading word of a query that is also the leading word of a manufacturer name is a brand
+                # the leading word of a query that is the leading word of a manufacturer name is a brand;
+                # a longer leading word may sit anywhere in the name ("Shanghai PYTES Energy" -> Pytes)
                 for man in known_manufacturers:
                     words = [squash(w) for w in tokens(man)]
-                    if words and words[0] == run:
+                    if words and (words[0] == run or (len(run) >= 5 and run in words and run not in CORPORATE_WORDS)):
                         brands.add(brand_short(man) or man)
                         hit = True
                         break

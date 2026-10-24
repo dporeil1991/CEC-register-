@@ -66,10 +66,28 @@ class MergeNeverDeletes(unittest.TestCase):
         self.assertEqual(a2["id"], "inv-2")
         self.assertEqual(s3["revived"], 1)
 
-    def test_identity_ignores_case_and_punctuation(self):
+    def test_identity_ignores_case_and_whitespace_only(self):
         first, _ = refresh.merge([], [rec("Acme Co Ltd", "SG5.0RS (AS4777-2 2020)")], "inverters", "2026-01-01", "f", "t")
         second, s = refresh.merge(first, [rec("ACME CO LTD", "SG5.0RS  (AS4777-2 2020)")], "inverters", "2026-02-01", "f", "t")
         self.assertEqual((len(second), s["added"], s["delisted_now"]), (1, 0, 0))
+
+    def test_plus_and_recertification_are_distinct_rows(self):
+        rows = [rec("Hanwha", "Q.MAXX-G4 410"), rec("Hanwha", "Q.MAXX-G4+ 410"),
+                rec("Sungrow", "SH5.0RS (AS4777-2 2020)", "2021-12-15", "2025-01-29"),
+                rec("Sungrow", "SH5.0RS (AS4777-2 2020)", "2025-01-30", "2028-01-30")]
+        merged, s = refresh.merge([], rows, "inverters", "2026-01-01", "f", "t")
+        self.assertEqual((len(merged), s["added"]), (4, 4))
+        # next pull drops the old SH5.0RS certification only
+        merged2, s2 = refresh.merge(merged, [rows[0], rows[1], rows[3]], "inverters", "2026-02-01", "f", "t")
+        self.assertEqual((len(merged2), s2["delisted_now"], s2["added"]), (4, 1, 0))
+        gone = [r for r in merged2 if r["delisted_date"]]
+        self.assertEqual((gone[0]["model"], gone[0]["approval_date"]), ("SH5.0RS (AS4777-2 2020)", "2021-12-15"))
+
+    def test_mixed_encoding(self):
+        body = "Manufacturer,Model Number\n".encode() + b"1KOMMA5\xb0 Technology GmbH,X\n" + "Pytes,V10α\n".encode("utf-8")
+        rows, fmt = refresh.rows_from_bytes(body, "x")
+        self.assertEqual([r["Model Number"] for r in rows], ["X", "V10α"])
+        self.assertEqual(rows[0]["Manufacturer"], "1KOMMA5° Technology GmbH")
 
 
 if __name__ == "__main__":

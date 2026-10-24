@@ -79,6 +79,8 @@ class Brands(unittest.TestCase):
         self.assertEqual(q["model"], "Primo GEN24 10.0 Plus")  # 'Plus' is a model word, not a brand
         q = split_query("Yingli YL250P-29b", ["Yingli Energy Development Co Ltd"])
         self.assertEqual((q["brands"], q["model"]), ({"Yingli"}, "YL250P-29b"))
+        q = split_query("Pytes V10", ["Shanghai PYTES Energy Co Ltd"])
+        self.assertEqual((q["brands"], q["model"]), ({"Shanghai PYTES"}, "V10"))
         q = split_query("Trina 440W")
         self.assertEqual((q["brands"], q["model"], q["ratings"]), ({"Trina"}, "", {"watts": 440}))
 
