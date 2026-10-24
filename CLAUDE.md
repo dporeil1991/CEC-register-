@@ -58,6 +58,9 @@ searched. Every check is appended to `data/jobs.csv` unless `--no-log`; always p
 - `cec`, `cec.py` – entry points; `ceclib/` – `normalise` (keys, ratings, aliases),
   `match` (ranking), `report` (result + sentence), `store` (SQLite, jobs CSV), `refresh`
   (download, merge, delist), `cli`.
+- `skill/SKILL.md` + `scripts/build_skill.py` → `dist/cec-register-check.skill`, the same
+  lookup packaged for everyday Claude. Rebuild after changing `ceclib/` or `skill/SKILL.md`,
+  and commit the rebuilt file. The workflow rebuilds it on every refresh.
 - `index.html` – static search UI over the same JSON (GitHub Pages ready).
 - `tests/` – `python3 -m unittest discover -s tests -t .`; `tests/seed_cases.json` are
   products checked by hand for real reports and must keep passing.

@@ -94,7 +94,56 @@ def classify(search: dict, as_at: dt.date, today: dt.date, kind_hint: str | None
         "brand_in_register": search.get("brand_in_register"),
     }
     out["sentence"] = sentence(out)
+    out["form_answer"] = form_answer(out)
     return out
+
+
+def form_answer(res: dict) -> str:
+    """Answer for the report form's "Is the <product> on the current CEC approved list" row.
+
+    The form asks about the *current* list, so this always reflects status today,
+    even when the check was run --as-at an install date.
+    """
+    listed = res.get("listed_name")
+    # The form asks about the current list. A past --as-at (install date) is restated as of
+    # today; a future --as-at is the planned issue date, so the result for that date stands.
+    past = res.get("as_at", "") < res.get("checked_on", "")
+    now = res.get("status_today") if past else None
+    result = res["result"]
+    if now:  # historical check: restate in terms of today
+        result = {"LISTED": "APPROVED", "EXPIRED": "EXPIRED", "DELISTED": "DELISTED"}.get(now, "NOT_LISTED")
+    if result in ("APPROVED", "APPROVED_EXPIRING"):
+        return f"Yes – listed as {listed}, approved until {short_date(res['approved_until'])}."
+    if result == "EXPIRED":
+        return f"No – not on the current CEC approved list (the listing for {listed} expired on {short_date(res['approved_until'])})."
+    if result == "DELISTED":
+        return f"No – not on the current CEC approved list (the listing for {listed} was removed on or about {short_date(res.get('delisted_date'))})."
+    noun = KIND_NOUN.get(res["kind"] or "", "product")
+    if res.get("near") and all(r.get("match_type") in ("brand", "brand-rating") for r in res["near"]):
+        return "Unable to confirm – the full model number is needed to match a specific CEC listing."
+    bir = res.get("brand_in_register") or {}
+    if res.get("brand") and bir and not any(bir.values()):
+        return f"No – no {res['brand']} {noun}s are on the current CEC approved list."
+    rating = _rating_text(res)
+    if rating and res.get("brand") and not res.get("near") and _no_model(res):
+        return f"No – no {res['brand']} {noun}s rated {rating} are on the CEC approved list, current or expired."
+    return "No – not on the current CEC approved list."
+
+
+def _rating_text(res: dict) -> str:
+    rq = res.get("rating_query") or {}
+    if "watts" in rq:
+        return f"{rq['watts']:g} W"
+    if "kw" in rq:
+        return f"{rq['kw']:g} kW"
+    if "kwh" in rq:
+        return f"{rq['kwh']:g} kWh"
+    return ""
+
+
+def _no_model(res: dict) -> bool:
+    """True when the query held only a brand and a rating, with no model number."""
+    return res.get("model_query", "").strip().lower() == _rating_text(res).lower()
 
 
 def sentence(res: dict) -> str:
@@ -124,6 +173,10 @@ def sentence(res: dict) -> str:
     if res["brand"] and bir and not any(bir.values()):
         return (f"The {name} {noun} is not listed on the CEC approved products list, and no {res['brand']} "
                 f"{noun}s appear on the list (checked {checked}).")
+    rating = _rating_text(res)
+    if rating and res["brand"] and not res.get("near") and not res.get("listed_name") and _no_model(res):
+        return (f"The {name} {noun} is not listed on the CEC approved products list; no current or expired "
+                f"{res['brand']} {noun} listing rated {rating} was found (checked {checked}).")
     if res.get("near") and res.get("match_type") is None and all(r.get("match_type") in ("brand", "brand-rating") for r in res["near"]):
         n = res.get("total_candidates") or len(res["near"])
         return (f"The {name} {noun} could not be matched to a specific CEC listing without the full model number; "

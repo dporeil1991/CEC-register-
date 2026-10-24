@@ -10,15 +10,38 @@ import csv
 import datetime as dt
 import hashlib
 import json
+import os
 import sqlite3
+import sys
+import tempfile
 from pathlib import Path
 
 from .normalise import brand_short, brands_for_manufacturer, extract_kw, extract_watts, model_key, split_standard
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
-DB_PATH = DATA / "cec.db"
+DB_PATH = Path(os.environ["CEC_DB_PATH"]) if os.environ.get("CEC_DB_PATH") else DATA / "cec.db"
 JOBS_CSV = DATA / "jobs.csv"
+# Running as an installed skill: the folder may be read-only and there is no jobs log to keep.
+SKILL_MODE = os.environ.get("CEC_SKILL") == "1" or (ROOT / "SKILL.md").exists()
+
+
+def _writable(directory: Path) -> bool:
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        probe = directory / ".write-test"
+        probe.write_text("x")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _db_location(db_path: Path) -> Path:
+    """The index lives beside the data when it can, otherwise in the temp directory."""
+    if _writable(db_path.parent):
+        return db_path
+    return Path(tempfile.gettempdir()) / "cec-register" / db_path.name
 KINDS = ("inverters", "modules", "batteries")
 KIND_ALIASES = {
     "inverter": "inverters", "inverters": "inverters", "inv": "inverters", "pce": "inverters",
@@ -125,10 +148,11 @@ def listing_row(kind: str, rec: dict, pull: dict | None) -> tuple:
 
 
 def build(db_path: Path | None = None) -> sqlite3.Connection:
-    db_path = db_path or DB_PATH
-    tmp = db_path.with_suffix(".tmp")
-    if tmp.exists():
-        tmp.unlink()
+    db_path = _db_location(db_path or DB_PATH)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    # each process builds its own file and swaps it in atomically, so a check running
+    # at the same moment never sees a half-built index
+    tmp = db_path.with_name(f"{db_path.stem}.{os.getpid()}.{os.urandom(4).hex()}.tmp")
     conn = sqlite3.connect(tmp)
     conn.executescript(SCHEMA)
     meta = json.loads((DATA / "meta.json").read_text(encoding="utf-8")) if (DATA / "meta.json").exists() else {}
@@ -149,13 +173,13 @@ def build(db_path: Path | None = None) -> sqlite3.Connection:
     conn.execute("INSERT INTO meta VALUES ('built_at', ?)", (dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),))
     conn.commit()
     conn.close()
-    tmp.replace(db_path)
+    os.replace(tmp, db_path)
     return sqlite3.connect(db_path)
 
 
 def connect(db_path: Path | None = None, rebuild: bool = False) -> sqlite3.Connection:
     """Open the index, rebuilding it when any source file changed."""
-    db_path = db_path or DB_PATH
+    db_path = _db_location(db_path or DB_PATH)
     if db_path.exists() and not rebuild:
         conn = sqlite3.connect(db_path)
         try:
@@ -175,8 +199,15 @@ def pulls(conn: sqlite3.Connection) -> dict[str, dict]:
     return {r["kind"]: dict(r) for r in conn.execute("SELECT * FROM pulls")}
 
 
+class NoRegisterData(RuntimeError):
+    """The register for a category is missing or empty. A check must never answer from no data."""
+
+
 def listings(conn: sqlite3.Connection, kind: str) -> list[dict]:
-    return [dict(r) for r in conn.execute("SELECT * FROM listings WHERE kind=?", (kind,))]
+    rows = [dict(r) for r in conn.execute("SELECT * FROM listings WHERE kind=?", (kind,))]
+    if not rows:
+        raise NoRegisterData(f"no {kind} listings loaded; the register data is missing, so no answer can be given")
+    return rows
 
 
 def manufacturers(conn: sqlite3.Connection, kind: str | None = None) -> list[str]:
@@ -196,9 +227,12 @@ def read_jobs(path: Path | None = None) -> list[dict]:
 
 def append_job(row: dict, path: Path | None = None) -> None:
     path = path or JOBS_CSV
-    new = not path.exists() or path.stat().st_size == 0
-    with path.open("a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=JOB_COLUMNS, extrasaction="ignore")
-        if new:
-            w.writeheader()
-        w.writerow({c: row.get(c, "") for c in JOB_COLUMNS})
+    try:
+        new = not path.exists() or path.stat().st_size == 0
+        with path.open("a", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=JOB_COLUMNS, extrasaction="ignore")
+            if new:
+                w.writeheader()
+            w.writerow({c: row.get(c, "") for c in JOB_COLUMNS})
+    except OSError as e:
+        print(f"(check not logged: {e})", file=sys.stderr)

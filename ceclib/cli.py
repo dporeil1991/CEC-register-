@@ -81,6 +81,8 @@ def print_check(res: dict, conn, today: dt.date) -> None:
             print(f"  removed:         {report.short_date(res['delisted_date'])} (missing from the register pull on that date)")
     print(f"  checked:         {report.short_date(res['checked_on'])}")
     print()
+    print("Form answer (\"Is the ... on the current CEC approved list\"):")
+    print("  " + res["form_answer"])
     print("Report sentence:")
     print("  " + res["sentence"])
     if res["result"] == "APPROVED_EXPIRING" and res["as_at"] == res["checked_on"]:
@@ -98,6 +100,12 @@ def print_check(res: dict, conn, today: dt.date) -> None:
         bir = res.get("brand_in_register") or {}
         if res["brand"] and bir and not any(bir.values()):
             print(f"\n  No {res['brand']} products appear in the {kind_word} register at all.")
+        elif res["brand"] and bir and any(bir.values()) and not report._no_model(res):
+            n = int(sum(v for v in bir.values() if v >= 1))
+            print(f"\n  {res['brand']} has {n} current {kind_word} listing(s), but none close to this model number.")
+            print("  Confirm the model from the label photo. An older model that has dropped off the list looks like this.")
+        elif res.get("rating_query") and res["brand"] and report._no_model(res):
+            print(f"\n  {res['brand']} is on the list, but no {res['brand']} {kind_word} listing has that rating, current or expired.")
         else:
             print("\n  Nothing similar found. Check the model number from the label photo and try without a suffix.")
 
@@ -141,7 +149,7 @@ def cmd_check(args, conn) -> int:
         print(json.dumps(out, indent=2, ensure_ascii=False))
     else:
         print_check(res, conn, today)
-    if not args.no_log:
+    if not args.no_log and not store.SKILL_MODE:
         log_check(res, args.job, newest, args.note)
     return {"APPROVED": 0, "APPROVED_EXPIRING": 0, "EXPIRED": 2, "DELISTED": 2, "NOT_LISTED": 1}[res["result"]]
 
@@ -162,7 +170,7 @@ def cmd_batch(args, conn) -> int:
         print(f"need a 'model' column; got {list(rows[0].keys())}", file=sys.stderr)
         return 1
     _, newest = pull_summary(conn, KINDS, today)
-    out_cols = ["job", "kind", "query", "result", "result_label", "listed_name", "manufacturer", "approved_until", "as_at", "checked_on", "confidence", "sentence"]
+    out_cols = ["job", "kind", "query", "result", "result_label", "listed_name", "manufacturer", "approved_until", "as_at", "checked_on", "confidence", "form_answer", "sentence"]
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=out_cols)
     w.writeheader()
@@ -182,8 +190,9 @@ def cmd_batch(args, conn) -> int:
         w.writerow({"job": job, "kind": res["kind"] or "", "query": res["query"], "result": res["result"],
                     "result_label": res["result_label"], "listed_name": res["listed_name"] or "",
                     "manufacturer": res["manufacturer"] or "", "approved_until": res["approved_until"] or "",
-                    "as_at": res["as_at"], "checked_on": res["checked_on"], "confidence": res["confidence"], "sentence": res["sentence"]})
-        if not args.no_log:
+                    "as_at": res["as_at"], "checked_on": res["checked_on"], "confidence": res["confidence"],
+                    "form_answer": res["form_answer"], "sentence": res["sentence"]})
+        if not args.no_log and not store.SKILL_MODE:
             log_check(res, job, newest, "batch")
         worst = max(worst, {"APPROVED": 0, "APPROVED_EXPIRING": 0, "EXPIRED": 2, "DELISTED": 2, "NOT_LISTED": 1}[res["result"]])
     if args.out:
@@ -328,4 +337,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "rebuild":
         print(f"rebuilt {store.DB_PATH}")
         return 0
-    return {"check": cmd_check, "batch": cmd_batch, "expiring": cmd_expiring, "jobs": cmd_jobs, "stats": cmd_stats}[args.cmd](args, conn)
+    try:
+        return {"check": cmd_check, "batch": cmd_batch, "expiring": cmd_expiring, "jobs": cmd_jobs, "stats": cmd_stats}[args.cmd](args, conn)
+    except store.NoRegisterData as e:
+        print(f"ERROR: {e}. Do not report a result; run the check again, and if it repeats the data needs reinstalling.", file=sys.stderr)
+        return 3

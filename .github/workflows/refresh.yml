@@ -32,6 +32,9 @@ jobs:
       - name: Download and merge the CEC lists (rows are never deleted, only marked delisted)
         run: python scripts/refresh.py
 
+      - name: Rebuild the skill file with the new data
+        run: python scripts/build_skill.py
+
       - name: Show what changed
         run: |
           python cec.py stats
@@ -41,7 +44,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data
+          git add data dist
           if git diff --cached --quiet; then
             echo "No changes in register data."
             exit 0

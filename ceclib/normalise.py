@@ -42,7 +42,8 @@ CORPORATE_WORDS = {"technology", "technologies", "electric", "electrical", "elec
 
 STOPWORDS = {"inverter", "inverters", "panel", "panels", "module", "modules", "battery", "batteries",
              "solar", "hybrid", "pv", "the", "and", "kw", "w", "kwh", "model", "series", "string",
-             "single", "phase", "three", "grid", "tied", "tie"}
+             "single", "phase", "three", "grid", "tied", "tie", "poly", "mono", "monocrystalline",
+             "polycrystalline", "crystalline", "black", "cell", "cells", "watt", "watts"}
 
 
 def squash(s: str | None) -> str:

@@ -74,6 +74,17 @@ downloads the three lists, merges them, runs the tests and commits. Locally:
 `./cec refresh`, or `./cec refresh --from-file modules ~/Downloads/file.csv` for a file
 you downloaded yourself. `git log -p data/raw` shows exactly what changed between pulls.
 
+## Skill for everyday Claude
+
+`dist/cec-register-check.skill` packages the same lookup and a data snapshot as a Claude
+skill, so the Claude that drafts reports can run checks itself. It fills the form rows
+("Yes – listed as …, approved until …"), writes the flag lines and the formal sentence.
+
+- Install: download the file and add it in Claude under Settings → Capabilities → Skills.
+- Update: each run of the refresh workflow rebuilds the file with the new data. Download it
+  again and re-upload it when the skill reports data older than 30 days.
+- Build by hand: `python3 scripts/build_skill.py`. The instructions live in `skill/SKILL.md`.
+
 ## Web UI
 
 `index.html` searches the same data in a browser. Serve the folder (`python3 -m

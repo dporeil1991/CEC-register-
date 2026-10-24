@@ -117,13 +117,16 @@ def search(conn, query: str, kinds: tuple[str, ...] | None, as_at: dt.date, limi
     kinds = kinds or KINDS
     parsed = split_query(query, manufacturers(conn))
     results = []
-    brand_seen_in_kind = {k: False for k in kinds}
+    brand_seen_in_kind = {k: 0 for k in kinds}
     for kind in kinds:
         for rec in listings(conn, kind):
             if parsed["brands"]:
                 rb = brands_for_manufacturer(rec["manufacturer"])
                 if rb & parsed["brands"] or any(squash(b) in squash(rec["manufacturer"]) for b in parsed["brands"]):
-                    brand_seen_in_kind[kind] = True
+                    if status_of(rec, as_at) == "LISTED":
+                        brand_seen_in_kind[kind] += 1
+                    elif not brand_seen_in_kind[kind]:
+                        brand_seen_in_kind[kind] = 0.5  # only expired listings for this brand
             s, mtype = score(parsed, rec)
             if s < min_score:
                 continue

@@ -83,6 +83,47 @@ class FixtureRegister(unittest.TestCase):
         self.assertEqual(r["result"], "APPROVED")
         self.assertIn("with approval valid until 17 October 2027 (checked 24 October 2026).", r["sentence"])
 
+    def test_form_answers(self):
+        self.assertEqual(self.check("Tesla Powerwall 3", "batteries")["form_answer"],
+                         "Yes – listed as 1707000-10 kVA (AS4777-2 2020), approved until 17/10/2027.")
+        self.assertEqual(self.check("Fronius Primo 5.0-1", "inverters")["form_answer"],
+                         "No – not on the current CEC approved list (the listing for Primo 5.0-1 AUS (AS4777-2 2020) expired on 14/03/2022).")
+        self.assertEqual(self.check("Samil Power SR2K8TLA1", "inverters")["form_answer"],
+                         "No – no Samil Power inverters are on the current CEC approved list.")
+        self.assertTrue(self.check("Trina 440W", "modules")["form_answer"].startswith("Unable to confirm"))
+        r = self.check("Trina 265w poly", "modules")
+        self.assertEqual(r["form_answer"], "No – no Trina solar panels rated 265 W are on the CEC approved list, current or expired.")
+        self.assertIn("no current or expired Trina solar panel listing rated 265 W", r["sentence"])
+        # the form asks about the current list even when checked as at an install date
+        r = self.check("Fronius Primo 5.0-1", "inverters", dt.date(2020, 1, 1))
+        self.assertEqual(r["result"], "APPROVED")
+        self.assertTrue(r["form_answer"].startswith("No – not on the current CEC approved list"))
+
+    def test_future_issue_date_form_answer(self):
+        # Powerwall listing runs to 17/10/2027; a report issued after that must say No
+        r = self.check("Tesla Powerwall 3", "batteries", dt.date(2027, 12, 1))
+        self.assertEqual(r["result"], "EXPIRED")
+        self.assertTrue(r["form_answer"].startswith("No – not on the current CEC approved list"))
+
+    def test_no_data_is_an_error_not_a_no(self):
+        import sqlite3
+        empty = sqlite3.connect(":memory:")
+        empty.row_factory = sqlite3.Row
+        empty.executescript(store.SCHEMA)
+        with self.assertRaises(store.NoRegisterData):
+            cli.do_check(empty, "Solis S5-GR1P5K", "inverters", TODAY, TODAY, 5)
+
+    def test_concurrent_checks_agree(self):
+        import subprocess, sys as _sys, os as _os
+        (store.DATA / "cec.db").unlink(missing_ok=True)
+        env = dict(_os.environ, PYTHONPATH=str(store.ROOT))
+        code = ("import datetime as dt, ceclib.store as s, ceclib.refresh as r, ceclib.cli as c, pathlib;"
+                f"d=pathlib.Path({str(store.DATA)!r});s.DATA=d;s.DB_PATH=d/'cec.db';s.JOBS_CSV=d/'jobs.csv';"
+                "conn=s.connect();x=c.do_check(conn,'Tesla Powerwall 3','batteries',dt.date(2026,10,24),dt.date(2026,10,24),3);print(x['result'])")
+        procs = [subprocess.Popen([_sys.executable, "-c", code], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for _ in range(8)]
+        outs = [p.communicate(timeout=120) for p in procs]
+        self.assertEqual([o[0].strip() for o in outs], ["APPROVED"] * 8, [o[1][-300:] for o in outs])
+
     def test_delisted_status(self):
         rows = json.loads((store.DATA / "inverters.json").read_text())
         rows[-1]["delisted_date"] = "2026-09-01"
